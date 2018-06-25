@@ -1,28 +1,20 @@
-///<reference path='./CommonDataObjects.ts'/>
-///<reference path='../../node_modules/immutable/dist/immutable.d.ts'/>
+import { IDecisionTreePredictor, ITreeLeaf, ITreeNode, IHasStringKey } from "./CommonDataObjects";
 
-
-import common    = require('./CommonDataObjects');
-import Immutable = require('immutable');
-
-type ITreeLeaf      = common.Dto.ITreeLeaf;
-type ITreeNode      = common.Dto.ITreeNode;
-type ITreeItem      = ITreeLeaf | ITreeNode;
-type PredictionItem = {[p: string]: any};
+type ITreeItem = ITreeLeaf | ITreeNode;
 
 export class DecisionTreePredictor
-    implements common.Dto.IDecisionTreePredictor<string> {
+    implements IDecisionTreePredictor<string> {
 
-    private _tree : ITreeItem;
+    private tree: ITreeItem;
 
     constructor(tree: ITreeItem) {
-        this._tree = tree;
+        this.tree = tree;
     }
 
-    public predict(item: PredictionItem) {
-        let tree = this._tree;
-        while(true) {
-            if (tree.hasOwnProperty('category')) {
+    public predict(item: IHasStringKey) {
+        let tree = this.tree;
+        while (true) {
+            if (tree.hasOwnProperty("category")) {
                 return (tree as ITreeLeaf).category;
             }
             const node      = tree as ITreeNode;

@@ -42,3 +42,8 @@ bin
 obj
 *.tmp
 *.dat
+
+.history
+.webpack
+.idea
+bin

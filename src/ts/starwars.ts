@@ -1,20 +1,18 @@
-﻿
+﻿import swapi from "swapi-node";
+import { range } from "lodash";
+import Axios, { AxiosResponse } from "axios";
+import { of } from "rxjs";
+import { map, flatMap, reduce } from "rxjs/operators";
 
-const swapi = require('swapi-node');
+async function getTrainingSet() {
+    const peopleArray = await of(...range(5, 10), 2)
+        .pipe(map(x => `https://swapi.co/api/people/?format=json&page=${x}`))
+        .pipe(flatMap(x => Axios.get(x).catch(console.error)))
+        .pipe(map((x: AxiosResponse) => x.data))
+        .pipe(reduce((acc: any[], x: any) => [x, ...acc], []))
+        .toPromise();
 
-
-const getTrainingSet = () => {
-    swapi.get('http://swapi.co/api/people/').then(function (result) {
-        console.log(JSON.stringify(result, null, 2));
-        return result.nextPage();
-    }).then(function (result) {
-        console.log(JSON.stringify(result, null, 2));
-        return result.nextPage();
-    }).then(function (result) {
-        console.log(JSON.stringify(result, null, 2));
-    }).catch(function (err) {
-        console.log(err);
-    });
+    console.log(JSON.stringify(peopleArray, null, 2));
 }
 
 getTrainingSet();

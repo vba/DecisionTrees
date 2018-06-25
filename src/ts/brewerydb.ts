@@ -1,23 +1,22 @@
-///<reference path='../../typings/request/request.d.ts'/>
 
-import Immutable = require('immutable');
-import request   = require('request');
+import Immutable = require("immutable");
+import request   = require("request");
 const key        = process.env.BREWERY_DB_KEY;
-const endpoint   = 'http://api.brewerydb.com/v2/'
+const endpoint   = "http://api.brewerydb.com/v2/";
 const page       = 4;
 
-request([endpoint, 'styles?key=', key].join(''), (err, resp, body) => {
+request([endpoint, "styles?key=", key].join(""), (err, resp, body) => {
     console.log(resp.statusCode);
     const styles = JSON.parse(body).data.map(x => Immutable.Map({id: x.id, name: x.name}).toObject());
     const beers = [];
     for (let i = 0; i < styles.length; i++) {
         const style = styles[i];
-        const url = [endpoint, 'beers?key=', key, '&styleId=', style.id, '&p=', page].join('');
+        const url = [endpoint, 'beers?key=', key, '&styleId=', style.id, "&p=", page].join("");
         request(url, (err, resp, body) => {
             const data = JSON.parse(body).data;
             if (data == null) { return; }
             data.forEach(beer => {
-                if (!beer['abv'] || !beer['ibu'] || !beer['srmId']) {
+                if (!beer["abv"] || !beer["ibu"] || !beer["srmId"]) {
                     return;
                 }
                 const beer2 = {
@@ -26,7 +25,7 @@ request([endpoint, 'styles?key=', key].join(''), (err, resp, body) => {
                     glassId: beer.glasswareId || "0",
                     availableId: beer.availableId || "0",
                     style: style.name,
-                    isOrganic: [beer.isOrganic].join('').toLowerCase() === 'y',
+                    isOrganic: [beer.isOrganic].join("").toLowerCase() === "y",
                     abv: beer.abv,
                     ibu: beer.ibu,
                     srmId: beer.srmId,

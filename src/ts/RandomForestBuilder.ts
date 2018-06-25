@@ -1,41 +1,31 @@
-///<reference path='./CommonDataObjects.ts'/>
-///<reference path='../../node_modules/immutable/dist/immutable.d.ts'/>
+import { ITreeLeaf, ITreeNode, IHasStringKey, ITreeConfig } from "./CommonDataObjects";
+import { DecisionTreeBuilder } from "./DecisionTreeBuilder";
+import { Map, List } from "immutable";
 
-import common              = require('./CommonDataObjects');
-import builder             = require('./DecisionTreeBuilder');
-import Immutable           = require('immutable');
-import DecisionTreeBuilder = builder.DecisionTreeBuilder;
+type ITreeItem = ITreeLeaf | ITreeNode;
+type IForest   = ITreeItem[];
 
-type ITreeConfig<T>         = common.Dto.ITreeConfig<T>;
-type ITreeLeaf              = common.Dto.ITreeLeaf;
-type ITreeNode              = common.Dto.ITreeNode;
-type ITreeItem              = ITreeLeaf | ITreeNode;
-type BasicTrainingItem      = {[p: string]: any};
-type List<T>                = Immutable.List<T>;
-type IForest                = ITreeItem[]
-
-export class RandomForestBuilder<T extends BasicTrainingItem> {
+export class RandomForestBuilder<T extends IHasStringKey> {
     public build(config: ITreeConfig<T>, forestSize: number = 3): IForest {
-        const configMap = Immutable.Map<string, any>(config);
+        const configMap = Map<string, any>(config);
         const items = config.trainingSet
-            .reduce(this.reduceTrainingSet.bind(this, forestSize), Immutable.List<T[]>())
+            .reduce(this.reduceTrainingSet.bind(this, forestSize), List<T[]>())
             .map(this.mapSubTrainingSet.bind(this, configMap) as ((a: T[]) => ITreeItem))
             .toArray();
         return items;
     }
 
-    private mapSubTrainingSet(configMap: Immutable.Map<string,any>, array: T[]) : ITreeItem {
+    private mapSubTrainingSet(configMap: Map<string, any>, array: T[]): ITreeItem {
         return new DecisionTreeBuilder<T>()
-            .build(configMap.set('trainingSet', array).toObject() as ITreeConfig<T>)
+            .build(configMap.set("trainingSet", array).toObject() as ITreeConfig<T>);
     }
 
-    private reduceTrainingSet(forestSize: number, agg: List<T[]>, x: T, i: number) : List<T[]> {
+    private reduceTrainingSet(forestSize: number, agg: List<T[]>, x: T, i: number): List<T[]> {
         const index = i % forestSize;
         let list = agg;
         if (list.size < (index + 1)) {
             list = list.push([]);
         }
-        return list.set(index,
-                        Immutable.List<T>(list.get(index)).push(x).toArray());
+        return list.set(index, List<T>(list.get(index)).push(x).toArray());
     }
 }
