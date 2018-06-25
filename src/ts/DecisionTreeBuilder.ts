@@ -9,19 +9,24 @@ interface IBasicTrainingItem {
     [p: string]: any;
 }
 
+interface IGroupedLabels {
+    [x: string]: number;
+}
+
+enum Operation {
+    EQUAL_OP = "==",
+    MORE_EQUAL_OP = ">=",
+}
 export class DecisionTreeBuilder<T extends IBasicTrainingItem> {
     private static TRAINING_SET = "trainingSet";
     private static CATEGORY_KEY = "categoryKey";
     private static MAX_DEPTH_KEY = "maxDepth";
-    private static EQUAL_OP = "==";
-    private static MORE_EQUAL_OP = ">=";
     private static GAIN = "gain";
 
-    private predicates: { [x: string]: Predicate } =
-        Map<string, Predicate>()
-            .set(DecisionTreeBuilder.EQUAL_OP, (a, b) => a === b)
-            .set(DecisionTreeBuilder.MORE_EQUAL_OP, (a, b) => a >= b)
-            .toObject();
+    private readonly predicates: { [x: string]: Predicate } = Object.freeze({
+        [Operation.EQUAL_OP]: (a, b) => a === b,
+        [Operation.MORE_EQUAL_OP]: (a, b) => a >= b,
+    });
 
     public build(config: ITreeConfig<T>): ITreeNode | ITreeLeaf {
         if (config.maxDepth === 0
@@ -37,47 +42,45 @@ export class DecisionTreeBuilder<T extends IBasicTrainingItem> {
         }
 
         const trainingSet  = config.trainingSet.map(this.mapTrainingItem.bind(this, config));
-        const configMap    = Map<string, any>(config).set(DecisionTreeBuilder.TRAINING_SET, trainingSet);
-        const reduce: R    = this.reduceToBestInfoGain.bind(this, initEntropy, configMap, []);
-        const bestSplitMap = trainingSet.reduce<ImmutableMap>(reduce, Map({gain: 0}));
-        const bestSplit    = bestSplitMap.toObject() as ISplit<T>;
+        const configMap    = {...config, [DecisionTreeBuilder.TRAINING_SET]: trainingSet};
+        const reduce       = this.reduceToBestInfoGain.bind(this, initEntropy, configMap, []) as R;
+        const bestSplit = trainingSet.reduce(reduce, {gain: 0}) as ISplit<T>;
 
         if (bestSplit.gain <= 0) {
             return this.buildCategory(config);
         }
 
-        const newConfigMap     = configMap.set(DecisionTreeBuilder.MAX_DEPTH_KEY, config.maxDepth - 1);
-        const matchedConfig    = newConfigMap.set(DecisionTreeBuilder.TRAINING_SET, bestSplit.matched).toObject() as C;
-        const matchedSubTree   = this.build(matchedConfig);
-        const unmatchedConfig  = newConfigMap
-            .set(DecisionTreeBuilder.TRAINING_SET, bestSplit.unmatched).toObject() as C;
-        const unmatchedSubTree = this.build(unmatchedConfig);
+        const newConfigMap  = { ...configMap, [DecisionTreeBuilder.MAX_DEPTH_KEY]: config.maxDepth - 1 };
+        const trueConfig    = { ...newConfigMap, [DecisionTreeBuilder.TRAINING_SET]: bestSplit.true } as C;
+        const trueSubTree   = this.build(trueConfig);
+        const falseConfig   = { ...newConfigMap, [DecisionTreeBuilder.TRAINING_SET]: bestSplit.false } as C;
+        const falseSubTree  = this.build(falseConfig);
 
         const result: ITreeNode = {
             key:            bestSplit.key,
             predicate:      bestSplit.predicate,
             predicateName:  bestSplit.predicateName,
             pivot:          bestSplit.pivot,
-            matched:        matchedSubTree,
-            unmatched:      unmatchedSubTree,
+            true:           trueSubTree,
+            false:          falseSubTree,
         };
         return result;
     }
 
     private reduceToBestInfoGain(initialEntropy: number,
-                                 configMap: ImmutableMap,
+                                 configMap: any,
                                  checkedItems: string[],
-                                 prev: ImmutableMap,
-                                 item: T): ImmutableMap {
+                                 prev: any,
+                                 item: T): any {
 
-        type M = (a: any, b: string) => ImmutableMap;
+        type M = (a: any, b: string) => any;
         const mapEvaluation: M = this.mapTrainingDataToInfoGain.bind(this, initialEntropy, configMap, checkedItems);
         const current = Map<string, any>(item)
-            .filter((v, k) => k !== configMap.get(DecisionTreeBuilder.CATEGORY_KEY))
+            .filter((v, k) => k !== configMap[DecisionTreeBuilder.CATEGORY_KEY])
             .map(mapEvaluation)
-            .maxBy(x => x.get(DecisionTreeBuilder.GAIN));
+            .maxBy(x => x[DecisionTreeBuilder.GAIN]);
 
-        const result = (current.get(DecisionTreeBuilder.GAIN) > prev.get(DecisionTreeBuilder.GAIN))
+        const result = (current[DecisionTreeBuilder.GAIN] > prev[DecisionTreeBuilder.GAIN])
             ? current
             : prev;
 
@@ -85,39 +88,35 @@ export class DecisionTreeBuilder<T extends IBasicTrainingItem> {
     }
 
     private mapTrainingDataToInfoGain(initialEntropy: number,
-                                      configMap: ImmutableMap,
+                                      configMap: any,
                                       checkedItems: string[],
                                       value: any,
-                                      key: string): ImmutableMap {
+                                      key: string): any {
 
             const pivot = /^[+-]?\d+(\.\d+)?$/.test(value) ? parseFloat(value) : value;
-            const predicateName = this.isNumber(pivot)
-                ? DecisionTreeBuilder.MORE_EQUAL_OP
-                : DecisionTreeBuilder.EQUAL_OP;
+            const predicateName = this.isNumber(pivot) ? Operation.MORE_EQUAL_OP : Operation.EQUAL_OP;
 
-            const keyPredPivot  = [key, predicateName, pivot].join("");
+            const keyPivot = [key, predicateName, pivot].join("");
 
-            if (checkedItems.indexOf(keyPredPivot) !== -1) {
-                return Map({gain: -1});
+            if (checkedItems.indexOf(keyPivot) !== -1) {
+                return {gain: -1};
             }
-            checkedItems.push(keyPredPivot);
+            checkedItems.push(keyPivot);
 
             const predicate = this.predicates[predicateName];
-            const split     = this.split(key, predicate, pivot, configMap.get(DecisionTreeBuilder.TRAINING_SET));
+            const split     = this.split(key, predicate, pivot, configMap[DecisionTreeBuilder.TRAINING_SET]);
             const gain      = this.calculateInfoGain(initialEntropy, configMap, split);
 
-            return Map({ gain, predicateName, predicate, key, pivot,
-                                   matched: split.matched,
-                                   unmatched: split.unmatched });
+            return {gain, predicateName, predicate, key, pivot, true: split.true, false: split.false};
         }
 
     private calculateInfoGain(initialEntropy: number,
-                              configMap: ImmutableMap,
+                              configMap: any,
                               split: IEvaluationResult<T>) {
-        const me      = this.calculateEntropy(split.matched, configMap.get(DecisionTreeBuilder.CATEGORY_KEY));
-        const ue      = this.calculateEntropy(split.unmatched, configMap.get(DecisionTreeBuilder.CATEGORY_KEY));
-        const entropy = ((me * split.matched.length) + (ue * split.unmatched.length));
-        const gain    = initialEntropy - (entropy / configMap.get(DecisionTreeBuilder.TRAINING_SET).length);
+        const me      = this.calculateEntropy(split.true, configMap[DecisionTreeBuilder.CATEGORY_KEY]);
+        const ue      = this.calculateEntropy(split.false, configMap[DecisionTreeBuilder.CATEGORY_KEY]);
+        const entropy = ((me * split.true.length) + (ue * split.false.length));
+        const gain    = initialEntropy - (entropy / configMap[DecisionTreeBuilder.TRAINING_SET].length);
         return gain;
     }
 
@@ -140,55 +139,40 @@ export class DecisionTreeBuilder<T extends IBasicTrainingItem> {
         };
     }
 
-    private getMostFrequentValue(items: T[], attr: string) {
-        const counter               = this.countUniqueValues(items, attr);
-        let mostFrequentCount       = 0;
-        let mostFrequentKey: string = null;
+    private getMostFrequentValue(items: T[], attr: string): string {
+        const grouped = this.groupValues(items, attr);
+        const tuple = Object.keys(grouped)
+            .reduce((acc: [string, number], x: string) =>
+                (grouped[acc[0]] || 0) > grouped[x] ? acc : [x, grouped[x]],
+                ["", 0]) as [string, number];
 
-        for (const key in counter) {
-            if (counter[key] <= mostFrequentCount) {
-                continue;
-            }
-            mostFrequentCount = counter[key];
-            mostFrequentKey   = key;
-        }
-
-        return mostFrequentKey;
+        return tuple[0];
     }
 
-    private countUniqueValues(items: T[], attr: string)
-        : {[x: string]: number} {
-        const counter: {[x: string]: number} = {};
-
-        for (let i = items.length - 1; i >= 0; i--) {
-            counter[items[i][attr]] = 0;
-        }
-        for (let i = items.length - 1; i >= 0; i--) {
-            counter[items[i][attr]] += 1;
-        }
-
-        return counter;
+    private groupValues(items: T[], attr: string): IGroupedLabels {
+            return items.reduce((acc: IGroupedLabels, x: T) => ({
+                ...acc,
+                [x[attr]]: acc.hasOwnProperty(x[attr]) ? acc[x[attr]] + 1 : 1,
+            }), {});
     }
 
     private calculateEntropy(items: T[], attr: string) {
-        const counter = this.countUniqueValues(items, attr);
+        const groupedValues = this.groupValues(items, attr);
         const result = Object
-            .keys(counter)
-            .map(key => counter[key] / items.length)
-            .reduce((agg, x) => {
-                return agg + (-x * Math.log(x));
-            }, 0);
+            .keys(groupedValues)
+            .map(key => groupedValues[key] / items.length)
+            .reduce((agg: number, x: number) => agg + (-x * Math.log(x)), 0);
         return result;
     }
 
-    private split(key: string,
+    private split(label: string,
                   predicate: Predicate,
                   pivot: number,
                   items: T[]): IEvaluationResult<T> {
-        const seed = {matched: [], unmatched: []};
-        const reduce = (aggregated: IEvaluationResult<T>, x) => {
-            aggregated[(!predicate(x[key], pivot) ? "un" : "") + "matched"].push(x);
-            return aggregated;
+        const seed = {true: [], false: []};
+        const reduce = (acc: IEvaluationResult<T>, x: T) => {
+            const key = (!predicate(x[label], pivot) ? "false" : "true");
+            return { ...acc, [key]: [...acc[key], x] };
         };
         return items.reduce(reduce, seed);
     }

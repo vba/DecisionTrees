@@ -2,8 +2,8 @@
 type Predicate = (a: any, pivot: any) => boolean;
 
 export interface IEvaluationResult<T> {
-    matched: T[];
-    unmatched: T[];
+    true: T[];
+    false: T[];
 }
 
 export interface IHasStringKey {
@@ -15,8 +15,8 @@ export interface ISplit<T> {
     predicate: Predicate;
     predicateName: string;
     pivot: any;
-    matched: T[];
-    unmatched: T[];
+    true: T[];
+    false: T[];
     gain: number;
 }
 
@@ -25,8 +25,8 @@ export interface ITreeNode {
     predicate: Predicate;
     predicateName: string;
     pivot: any;
-    matched: ITreeNode | ITreeLeaf;
-    unmatched: ITreeNode | ITreeLeaf;
+    true: ITreeNode | ITreeLeaf;
+    false: ITreeNode | ITreeLeaf;
 }
 
 export interface ITreeLeaf {

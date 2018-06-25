@@ -21,7 +21,7 @@ export class DecisionTreePredictor
             const value     = item[node.key];
             const predicate = node.predicate;
             const pivot     = node.pivot;
-            tree            = predicate(value, pivot) ? node.matched : node.unmatched;
+            tree            = predicate(value, pivot) ? node.true : node.false;
         }
     }
 }
