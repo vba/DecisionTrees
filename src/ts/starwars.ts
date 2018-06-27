@@ -1,5 +1,4 @@
-﻿import swapi from "swapi-node";
-import { range } from "lodash";
+﻿import { range } from "lodash";
 import Axios, { AxiosResponse } from "axios";
 import { of } from "rxjs";
 import { map, flatMap, reduce } from "rxjs/operators";

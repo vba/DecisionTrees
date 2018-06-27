@@ -42,7 +42,7 @@ export class DecisionTreeBuilder<T extends IBasicTrainingItem> {
         }
 
         const trainingSet  = config.trainingSet.map(this.mapTrainingItem.bind(this, config));
-        const configMap    = {...config, [DecisionTreeBuilder.TRAINING_SET]: trainingSet};
+        const configMap    = {...config, trainingSet};
         const reduce       = this.reduceToBestInfoGain.bind(this, initEntropy, configMap, []) as R;
         const bestSplit = trainingSet.reduce(reduce, {gain: 0}) as ISplit<T>;
 
@@ -50,10 +50,10 @@ export class DecisionTreeBuilder<T extends IBasicTrainingItem> {
             return this.buildCategory(config);
         }
 
-        const newConfigMap  = { ...configMap, [DecisionTreeBuilder.MAX_DEPTH_KEY]: config.maxDepth - 1 };
-        const trueConfig    = { ...newConfigMap, [DecisionTreeBuilder.TRAINING_SET]: bestSplit.true } as C;
+        const newConfigMap  = { ...configMap, maxDepth: config.maxDepth - 1 } as C;
+        const trueConfig    = { ...newConfigMap, trainingSet: bestSplit.true } as C;
         const trueSubTree   = this.build(trueConfig);
-        const falseConfig   = { ...newConfigMap, [DecisionTreeBuilder.TRAINING_SET]: bestSplit.false } as C;
+        const falseConfig   = { ...newConfigMap, trainingSet: bestSplit.false } as C;
         const falseSubTree  = this.build(falseConfig);
 
         const result: ITreeNode = {
@@ -68,15 +68,15 @@ export class DecisionTreeBuilder<T extends IBasicTrainingItem> {
     }
 
     private reduceToBestInfoGain(initialEntropy: number,
-                                 configMap: any,
+                                 config: ITreeConfig<T>,
                                  checkedItems: string[],
                                  prev: any,
                                  item: T): any {
 
         type M = (a: any, b: string) => any;
-        const mapEvaluation: M = this.mapTrainingDataToInfoGain.bind(this, initialEntropy, configMap, checkedItems);
+        const mapEvaluation: M = this.mapTrainingDataToInfoGain.bind(this, initialEntropy, config, checkedItems);
         const current = Map<string, any>(item)
-            .filter((v, k) => k !== configMap[DecisionTreeBuilder.CATEGORY_KEY])
+            .filter((v, k) => k !== config.categoryKey)
             .map(mapEvaluation)
             .maxBy(x => x[DecisionTreeBuilder.GAIN]);
 
@@ -88,7 +88,7 @@ export class DecisionTreeBuilder<T extends IBasicTrainingItem> {
     }
 
     private mapTrainingDataToInfoGain(initialEntropy: number,
-                                      configMap: any,
+                                      config: ITreeConfig<T>,
                                       checkedItems: string[],
                                       value: any,
                                       key: string): any {
@@ -104,19 +104,25 @@ export class DecisionTreeBuilder<T extends IBasicTrainingItem> {
             checkedItems.push(keyPivot);
 
             const predicate = this.predicates[predicateName];
-            const split     = this.split(key, predicate, pivot, configMap[DecisionTreeBuilder.TRAINING_SET]);
-            const gain      = this.calculateInfoGain(initialEntropy, configMap, split);
+            const split     = this.split(key, predicate, pivot, config.trainingSet);
+            const gain      = this.calculateInfoGain(initialEntropy, config, split);
 
-            return {gain, predicateName, predicate, key, pivot, true: split.true, false: split.false};
+            return {
+                gain, predicateName, predicate, key, pivot,
+                true: split.true,
+                false: split.false,
+            };
         }
 
     private calculateInfoGain(initialEntropy: number,
-                              configMap: any,
+                              config: ITreeConfig<T>,
                               split: IEvaluationResult<T>) {
-        const me      = this.calculateEntropy(split.true, configMap[DecisionTreeBuilder.CATEGORY_KEY]);
-        const ue      = this.calculateEntropy(split.false, configMap[DecisionTreeBuilder.CATEGORY_KEY]);
-        const entropy = ((me * split.true.length) + (ue * split.false.length));
-        const gain    = initialEntropy - (entropy / configMap[DecisionTreeBuilder.TRAINING_SET].length);
+        const trueLength = split.true.length;
+        const falseLength = split.false.length;
+        const trueEntropy = this.calculateEntropy(split.true, config.categoryKey);
+        const falseEntropy = this.calculateEntropy(split.false, config.categoryKey);
+        const totalEntropy = ((trueEntropy * trueLength) + (falseEntropy * falseLength));
+        const gain = initialEntropy - (totalEntropy / config.trainingSet.length);
         return gain;
     }
 

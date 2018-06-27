@@ -2,9 +2,11 @@ import { DecisionTreeBuilder } from "./DecisionTreeBuilder";
 import { DecisionTreePredictor } from "./DecisionTreePredictor";
 import { RandomForestBuilder } from "./RandomForestBuilder";
 import { RandomForestPredictor } from "./RandomForestPredictor";
-import SWTrainingSet from "../json/starwars_training.json";
-import { flatten } from "lodash";
+import { flatten, values, max } from "lodash";
 import { IHasStringKey } from "./CommonDataObjects";
+import IrisTrainingSet from "../json/iris_training.json";
+import SWTrainingSet from "../json/starwars_training.json";
+import IrisTestSet from "../json/iris_test.json";
 
 const simpsonSample = () => {
     interface ISimpsonsModel {
@@ -38,19 +40,11 @@ const simpsonSample = () => {
     };
 
     const singleTree = simpsonsTreeBuilder.build(config);
-
     const predictor = new DecisionTreePredictor(singleTree);
-
-    const forest = new RandomForestBuilder().build(config, 3);
-
-    const forestPredictor = new RandomForestPredictor(forest);
-
     const comic = {person: "Comic guy", hairLength: 8, weight: 290, age: 38};
 
     console.log(JSON.stringify(singleTree, null, 2));
-
     console.log("Predict with a single tree: ", predictor.predict(comic));
-    // console.log('Predict with a forest: ', forestPredictor.predict(comic))
 };
 
 const starwarsGenderSample = () => {
@@ -123,54 +117,26 @@ const starwarsGenderSample = () => {
     console.log("Jabba the Second: ", predictor.predict(testSubject4));
 };
 
-// const beersStyleSample = () => {
-//     const trainingBeersSet = (require('../../resources/training/beers_training') as []);
+function irisSample() {
+    const config = {
+        trainingSet     : IrisTrainingSet,
+        categoryKey     : "species",
+        ignoredKeys     : [],
+        entropyThreshold: 0.01,
+        maxDepth        : 90,
+        minItemsCount   : 0,
+    };
 
-//     const config = {
-//         trainingSet: trainingBeersSet,
-//         categoryKey: 'style',
-//         ignoredKeys: ['name', 'id'],
-//         entropyThreshold: 0.01,
-//         maxDepth: 90,
-//         minItemsCount: 0
-//     }
-//     //console.log(JSON.stringify(trainingPersonaSet, null, 2));
-//     const treeBuilder = new DecisionTreeBuilder<{ [x: string]: any }>();
-//     const tree = treeBuilder.build(config);
-//     const predictor = new DecisionTreePredictor(tree);
-
-//     const forest = new RandomForestBuilder().build(config, 4);
-//     const forestPredictor = new RandomForestPredictor(forest);
-
-//     const testSubject1 = {
-//         "id": "09IKmh",
-//         "name": "Labyrinth",
-//         "glassId": 8,
-//         "availableId": 1,
-//         "style": "Wood- and Barrel-Aged Strong Beer",
-//         "isOrganic": false,
-//         "abv": "13.2", // Alc
-//         "ibu": "56",  //  International Bittering Unit - the scale used to measure hop bitterness in beer
-//         "srmId": 41 // Color stuff
-//     };
-
-//     const testSubject2 = {
-//         "id": "jYBtXz",
-//         "name": "Abbey Ale",
-//         "glassId": 2,
-//         "availableId": 1,
-//         "style": "Belgian-Style Dubbel",
-//         "isOrganic": false,
-//         "abv": "8.2",
-//         "ibu": "20",
-//         "srmId": 38
-//     }
-
-//     console.log('Labyrinth (Wood- and Barrel-Aged Strong Beer): ', forestPredictor.predict(testSubject1));
-//     //console.log('Abbey Ale (Belgian-Style Dubbel): ', JSON.stringify(predictor.predict(testSubject2), null, 2));
-//     console.log('Abbey Ale (Belgian-Style Dubbel): ', JSON.stringify(forestPredictor.predict(testSubject2), null, 2));
-// };
+    const irisRandomForest = new RandomForestBuilder<any>().build(config, 2);
+    const forestPredictor = new RandomForestPredictor(irisRandomForest);
+    const forestErrorsCount = IrisTestSet
+        .filter(x => {
+            const prediction = forestPredictor.predict({...x, species: null});
+            return prediction[x.species] < max(values(prediction));
+        }).length;
+    console.log(`Forest errors ${forestErrorsCount} of ${IrisTestSet.length}`);
+}
 
 // simpsonSample();
-starwarsGenderSample();
-// beersStyleSample();
+// starwarsGenderSample();
+irisSample();
